@@ -44,6 +44,7 @@ int find_dev_and_part(const char *id, struct mtd_device **dev,
 #endif
 
 extern flash_info_t flash_info[];	/* info for FLASH chips */
+extern flash_info_t flash_info_nor[CFG_MAX_NOR_FLASH_BANKS];
 
 /*
  * The user interface starts numbering for Flash banks with 1
@@ -127,6 +128,7 @@ addr_spec(char *arg1, char *arg2, ulong *addr_first, ulong *addr_last)
 {
 	char len_used = 0; /* indicates if the "start +length" form used */
 	char *ep;
+	unsigned int val = 0;
 
 	*addr_first = simple_strtoul(arg1, &ep, 16);
 	if (ep == arg1 || *ep != '\0')
@@ -162,6 +164,13 @@ addr_spec(char *arg1, char *arg2, ulong *addr_first, ulong *addr_last)
 		for (bank = 0; bank < CFG_MAX_FLASH_BANKS && !found; ++bank){
 			int i;
 			flash_info_t *info = &flash_info[bank];
+			
+			val = *((volatile unsigned int *)(0xd8110100));
+    /* sf boot, only nand active, nor NOT active */
+    /*if (((val>>1)&0x3) == 0)
+      if (*addr_first < 0xF0000000 || *addr_last < 0xF0000000)
+        info = &flash_info_nor[bank];*/
+        
 			for (i = 0; i < info->sector_count && !found; ++i){
 				/* get the end address of the sector */
 				ulong sector_end_addr;
@@ -202,6 +211,7 @@ flash_fill_sect_ranges (ulong addr_first, ulong addr_last,
 	flash_info_t *info;
 	ulong bank;
 	int rcode = 0;
+	unsigned int val = 0;
 
 	*s_count = 0;
 
@@ -209,8 +219,14 @@ flash_fill_sect_ranges (ulong addr_first, ulong addr_last,
 		s_first[bank] = -1;	/* first sector to erase	*/
 		s_last [bank] = -1;	/* last  sector to erase	*/
 	}
+	val = *((volatile unsigned int *)(0xd8110100));
+    info=&flash_info[0];
+    /* sf boot only nand active, nor NOT active */
+    /*if (((val>>1)&0x3) == 0)
+      if (addr_first >= 0xE0000000 && addr_last < 0xF0000000)
+        info=&flash_info_nor[0];*/
 
-	for (bank=0,info=&flash_info[0];
+	for (bank=0;//,info=&flash_info[0];
 	     (bank < CFG_MAX_FLASH_BANKS) && (addr_first <= addr_last);
 	     ++bank, ++info) {
 		ulong b_end;
@@ -412,12 +428,20 @@ int flash_sect_erase (ulong addr_first, ulong addr_last)
 	int erased = 0;
 	int planned;
 	int rcode = 0;
+	unsigned int val = 0;
 
 	rcode = flash_fill_sect_ranges (addr_first, addr_last,
 					s_first, s_last, &planned );
 
 	if (planned && (rcode == 0)) {
-		for (bank=0,info=&flash_info[0];
+		info=&flash_info[0];
+		val = *((volatile unsigned int *)(0xd8110100));
+    /* sf boot only nand active, nor NOT active */
+    /*if (((val>>1)&0x3) == 0)
+      if (addr_first < 0xF0000000 || addr_last < 0xF0000000)
+        info = &flash_info_nor[0];*/
+
+		for (bank=0;//,info=&flash_info[0];
 		     (bank < CFG_MAX_FLASH_BANKS) && (rcode == 0);
 		     ++bank, ++info) {
 			if (s_first[bank]>=0) {

@@ -23,6 +23,9 @@
 
 /* #define	DEBUG	*/
 
+// Jiun 03/21/2013, usb hub
+#include <asm/arch/common_def.h>    /* WMT common definitions and macros */
+
 #include <common.h>
 #include <watchdog.h>
 #include <command.h>
@@ -35,6 +38,10 @@
 #endif
 
 #include <post.h>
+
+#ifdef CONFIG_SILENT_CONSOLE
+DECLARE_GLOBAL_DATA_PTR;
+#endif
 
 #if defined(CONFIG_BOOT_RETRY_TIME) && defined(CONFIG_RESET_TO_RETRY)
 extern int do_reset (cmd_tbl_t *cmdtp, int flag, int argc, char *argv[]);		/* for do_reset() prototype */
@@ -105,14 +112,10 @@ static __inline__ int abortboot(int bootdelay)
 	u_int i;
 
 #ifdef CONFIG_SILENT_CONSOLE
-	{
-		DECLARE_GLOBAL_DATA_PTR;
-
-		if (gd->flags & GD_FLG_SILENT) {
-			/* Restore serial console */
-			console_assign (stdout, "serial");
-			console_assign (stderr, "serial");
-		}
+	if (gd->flags & GD_FLG_SILENT) {
+		/* Restore serial console */
+		console_assign (stdout, "serial");
+		console_assign (stderr, "serial");
 	}
 #endif
 
@@ -195,17 +198,13 @@ static __inline__ int abortboot(int bootdelay)
 #  endif
 
 #ifdef CONFIG_SILENT_CONSOLE
-	{
-		DECLARE_GLOBAL_DATA_PTR;
-
-		if (abort) {
-			/* permanently enable normal console output */
-			gd->flags &= ~(GD_FLG_SILENT);
-		} else if (gd->flags & GD_FLG_SILENT) {
-			/* Restore silent console */
-			console_assign (stdout, "nulldev");
-			console_assign (stderr, "nulldev");
-		}
+	if (abort) {
+		/* permanently enable normal console output */
+		gd->flags &= ~(GD_FLG_SILENT);
+	} else if (gd->flags & GD_FLG_SILENT) {
+		/* Restore silent console */
+		console_assign (stdout, "nulldev");
+		console_assign (stderr, "nulldev");
 	}
 #endif
 
@@ -223,14 +222,10 @@ static __inline__ int abortboot(int bootdelay)
 	int abort = 0;
 
 #ifdef CONFIG_SILENT_CONSOLE
-	{
-		DECLARE_GLOBAL_DATA_PTR;
-
-		if (gd->flags & GD_FLG_SILENT) {
-			/* Restore serial console */
-			console_assign (stdout, "serial");
-			console_assign (stderr, "serial");
-		}
+	if (gd->flags & GD_FLG_SILENT) {
+		/* Restore serial console */
+		console_assign (stdout, "serial");
+		console_assign (stderr, "serial");
 	}
 #endif
 
@@ -247,9 +242,11 @@ static __inline__ int abortboot(int bootdelay)
 	 */
 	if (bootdelay >= 0) {
 		if (tstc()) {	/* we got a key press	*/
-			(void) getc();  /* consume input	*/
-			puts ("\b\b\b 0");
-			abort = 1; 	/* don't auto boot	*/
+			//(void) getc();  /* consume input	*/
+			if (getc() == 0xd){ /* "Enter" key */
+				puts ("\b\b\b 0");
+				abort = 1; 	/* don't auto boot	*/
+			}
 		}
 	}
 #endif
@@ -279,17 +276,13 @@ static __inline__ int abortboot(int bootdelay)
 	putc ('\n');
 
 #ifdef CONFIG_SILENT_CONSOLE
-	{
-		DECLARE_GLOBAL_DATA_PTR;
-
-		if (abort) {
-			/* permanently enable normal console output */
-			gd->flags &= ~(GD_FLG_SILENT);
-		} else if (gd->flags & GD_FLG_SILENT) {
-			/* Restore silent console */
-			console_assign (stdout, "nulldev");
-			console_assign (stderr, "nulldev");
-		}
+	if (abort) {
+		/* permanently enable normal console output */
+		gd->flags &= ~(GD_FLG_SILENT);
+	} else if (gd->flags & GD_FLG_SILENT) {
+		/* Restore silent console */
+		console_assign (stdout, "nulldev");
+		console_assign (stderr, "nulldev");
 	}
 #endif
 
@@ -302,6 +295,7 @@ static __inline__ int abortboot(int bootdelay)
 
 void main_loop (void)
 {
+	int abort = 0; //fan
 #ifndef CFG_HUSH_PARSER
 	static char lastcommand[CFG_CBSIZE] = { 0, };
 	int len;
@@ -408,11 +402,44 @@ void main_loop (void)
 	}
 	else
 #endif /* CONFIG_BOOTCOUNT_LIMIT */
-		s = getenv ("bootcmd");
+	if (tstc()) {
+		if (getc() == 0xd){ /* "Enter" key */
+			puts("Abort WMT Display Logo Function\n");
+			abort = 1; 	/* don't auto boot	*/
+		}
+	}
+	
+	// Jiun 03/21/2013, usbhub
+    puts("VAB600A: Reset GPIO 25...");
+    REG16_VAL(0xD81100b0) |= 0x200;
+    REG16_VAL(0xD8110070) |= 0x200;
+    REG16_VAL(0xD81100f0) |= 0x200;     // high
+    REG16_VAL(0xD81100f0) &= ~0x200;    // low
+    REG16_VAL(0xD81100f0) |= 0x200;     // high
+    puts("done\n");
+	
+	if (abort == 0) {
+		/*s= getenv("wmt.nfc.mtd.u-boot-logo");*/
+		if (1) {
+			/*s= getenv("wmt.display.logoaddr");*/
+			if (1) {
+				s= getenv("logocmd");
+				if (s) {
+		        	debug("logocmd=\"%s\"\n", s);
+					run_command(s, 0);
+		      	} else
+		      		debug("'logocmd' is not found , logocmd will not execute\n");
+	      	} else
+	      		debug("'wmt.display.logoaddr' is not found , logocmd will not execute\n");
+	      	
+		} else
+			debug("'wmt.nfc.mtd.u-boot-logo' is not found , logocmd will not execute\n");
+	}
 
+	s = getenv ("bootcmd");
 	debug ("### main_loop: bootcmd=\"%s\"\n", s ? s : "<UNDEFINED>");
 
-	if (bootdelay >= 0 && s && !abortboot (bootdelay)) {
+	if (bootdelay >= 0 && s && (abort == 0) && !abortboot (bootdelay)) {
 # ifdef CONFIG_AUTOBOOT_KEYED
 		int prev = disable_ctrlc(1);	/* disable Control C checking */
 # endif

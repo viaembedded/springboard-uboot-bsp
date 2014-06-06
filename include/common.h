@@ -100,7 +100,8 @@ typedef volatile unsigned char	vu_char;
 #include <part.h>
 #include <flash.h>
 #include <image.h>
-
+//#define DEBUG  1  //Charles
+#undef   DEBUG
 #ifdef	DEBUG
 #define debug(fmt,args...)	printf (fmt ,##args)
 #define debugX(level,fmt,args...) if (DEBUG>=level) printf(fmt,##args);
@@ -382,6 +383,15 @@ void		ppcSync(void);
 void		ppcDcbz(unsigned long value);
 #endif
 
+#define out32r(addr, val)	(*(volatile unsigned int *)(addr)) = val
+//#define REG_GET32(addr)		(*(volatile unsigned int *)(addr))
+//#define REG_VAL32(addr)		(*(volatile unsigned int *)(addr))
+#define out16r(addr,  val)	(*(volatile unsigned short *)(addr)) = val
+#define in16r(addr)		(*(volatile unsigned short *)(addr))
+//#define REG_VAL16(addr)		(*(volatile unsigned short *)(addr))
+//#define REG_SET8(addr, val)	(*(volatile unsigned char *)(addr)) = val
+//#define REG_GET8(addr)		(*(volatile unsigned char *)(addr))
+//#define REG_VAL8(addr)		(*(volatile unsigned char *)(addr))
 /* $(CPU)/cpu.c */
 int	checkcpu      (void);
 int	checkicache   (void);

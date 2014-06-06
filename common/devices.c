@@ -181,6 +181,9 @@ int devices_init (void)
 	}
 #if defined(CONFIG_HARD_I2C) || defined(CONFIG_SOFT_I2C)
 	i2c_init (CFG_I2C_SPEED, CFG_I2C_SLAVE);
+	i2c1_init (CFG_I2C_SPEED, CFG_I2C_SLAVE);
+	i2c2_init (CFG_I2C_SPEED, CFG_I2C_SLAVE);
+	i2c3_init (CFG_I2C_SPEED, CFG_I2C_SLAVE);
 #endif
 #ifdef CONFIG_LCD
 	drv_lcd_init ();

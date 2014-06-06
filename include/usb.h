@@ -25,8 +25,9 @@
  */
 #ifndef _USB_H_
 #define _USB_H_
-
+#define LITTLEENDIAN		1	/* used by usb_uhci.c		*/
 #include <usb_defs.h>
+#include <usbdescriptors.h>
 
 /* Everything is aribtrary */
 #define USB_ALTSETTINGALLOC		4
@@ -36,17 +37,11 @@
 #define USB_MAXCONFIG			8
 #define USB_MAXINTERFACES		8
 #define USB_MAXENDPOINTS		16
-#define USB_MAXCHILDREN			8	/* This is arbitrary */
+#define USB_MAXCHILDREN		8	/* This is arbitrary */
 #define USB_MAX_HUB			16
-
-#define USB_CNTL_TIMEOUT 100 /* 100ms timeout */
-
-/* String descriptor */
-struct usb_string_descriptor {
-	unsigned char  bLength;
-	unsigned char  bDescriptorType;
-	unsigned short wData[1];
-} __attribute__ ((packed));
+//Charles
+//#define USB_CNTL_TIMEOUT 100 /* 100ms timeout */
+#define USB_CNTL_TIMEOUT 0 /* 1ms x 5  timeout */
 
 /* device request (setup) */
 struct devrequest {
@@ -64,73 +59,37 @@ struct usb_descriptor_header {
 	unsigned char  bDescriptorType;
 } __attribute__ ((packed));
 
-/* Device descriptor */
-struct usb_device_descriptor {
-	unsigned char  bLength;
-	unsigned char  bDescriptorType;
-	unsigned short bcdUSB;
-	unsigned char  bDeviceClass;
-	unsigned char  bDeviceSubClass;
-	unsigned char  bDeviceProtocol;
-	unsigned char  bMaxPacketSize0;
-	unsigned short idVendor;
-	unsigned short idProduct;
-	unsigned short bcdDevice;
-	unsigned char  iManufacturer;
-	unsigned char  iProduct;
-	unsigned char  iSerialNumber;
-	unsigned char  bNumConfigurations;
-} __attribute__ ((packed));
+/* Interface */
+struct usb_interface {
+	struct usb_interface_descriptor desc;
 
+	unsigned char	no_of_ep;
+	unsigned char	num_altsetting;
+	unsigned char	act_altsetting;
 
-/* Endpoint descriptor */
-struct usb_endpoint_descriptor {
-	unsigned char  bLength;
-	unsigned char  bDescriptorType;
-	unsigned char  bEndpointAddress;
-	unsigned char  bmAttributes;
-	unsigned short wMaxPacketSize;
-	unsigned char  bInterval;
-	unsigned char  bRefresh;
-	unsigned char  bSynchAddress;
-
-} __attribute__ ((packed));
-/* Interface descriptor */
-struct usb_interface_descriptor {
-	unsigned char  bLength;
-	unsigned char  bDescriptorType;
-	unsigned char  bInterfaceNumber;
-	unsigned char  bAlternateSetting;
-	unsigned char  bNumEndpoints;
-	unsigned char  bInterfaceClass;
-	unsigned char  bInterfaceSubClass;
-	unsigned char  bInterfaceProtocol;
-	unsigned char  iInterface;
-
-	unsigned char  no_of_ep;
-	unsigned char  act_altsetting;
 	struct usb_endpoint_descriptor ep_desc[USB_MAXENDPOINTS];
 } __attribute__ ((packed));
 
+/* Configuration information.. */
+struct usb_config {
+	struct usb_configuration_descriptor desc;
 
-/* Configuration descriptor information.. */
-struct usb_config_descriptor {
-	unsigned char  bLength;
-	unsigned char  bDescriptorType;
-	unsigned short wTotalLength;
-	unsigned char  bNumInterfaces;
-	unsigned char  bConfigurationValue;
-	unsigned char  iConfiguration;
-	unsigned char  bmAttributes;
-	unsigned char  MaxPower;
-
-	unsigned char  no_of_if;		/* number of interfaces */
-	struct usb_interface_descriptor if_desc[USB_MAXINTERFACES];
+	unsigned char	no_of_if;	/* number of interfaces */
+	struct usb_interface if_desc[USB_MAXINTERFACES];
 } __attribute__ ((packed));
 
 
+enum {
+	/* Maximum packet size; encoded as 0,1,2,3 = 8,16,32,64 */
+	PACKET_SIZE_8   = 0,
+	PACKET_SIZE_16  = 1,
+	PACKET_SIZE_32  = 2,
+	PACKET_SIZE_64  = 3,
+};
+
 struct usb_device {
 	int devnum;			/* Device number on USB bus */
+	int	speed;			/* full/low/high */
 	int slow;			/* Slow device? */
 	char mf[32];			/* manufacturer */
 	char prod[32];			/* product */
@@ -145,8 +104,7 @@ struct usb_device {
 
 	int configno;			/* selected config number */
 	struct usb_device_descriptor descriptor; /* Device Descriptor */
-	struct usb_config_descriptor config; /* config descriptor */
-
+	struct usb_config config; /* config descriptor */
 	int have_langid;		/* whether string_langid is valid yet */
 	int string_langid;		/* language ID for strings */
 	int (*irq_handle)(struct usb_device *dev);
@@ -160,15 +118,17 @@ struct usb_device {
 	unsigned long status;
 	int act_len;			/* transfered bytes */
 	int maxchild;			/* Number of ports if hub */
+	int portnr;
 	struct usb_device *parent;
 	struct usb_device *children[USB_MAXCHILDREN];
-};
+} __attribute__ ((packed)) ;
 
 /**********************************************************************
  * this is how the lowlevel part communicate with the outer world
  */
+//CharlesTu,2011.03.30,suppport uhci and ehci drivers.
+#if defined(CONFIG_USB_EHCI) ||defined(CONFIG_USB_UHCI) | defined(CONFIG_USB_OHCI) || defined (CONFIG_USB_SL811HS)
 
-#if defined(CONFIG_USB_UHCI) || defined(CONFIG_USB_OHCI) || defined (CONFIG_USB_SL811HS)
 int usb_lowlevel_init(void);
 int usb_lowlevel_stop(void);
 int submit_bulk_msg(struct usb_device *dev, unsigned long pipe, void *buffer,int transfer_len);
@@ -176,11 +136,24 @@ int submit_control_msg(struct usb_device *dev, unsigned long pipe, void *buffer,
 			int transfer_len,struct devrequest *setup);
 int submit_int_msg(struct usb_device *dev, unsigned long pipe, void *buffer,
 			int transfer_len, int interval);
+//port routing
+void ehci_disable_port_owner(void);
+int uhci_lowlevel_init(void);
+int uhci_lowlevel_stop(void);
+int submit_uhci_bulk_msg(struct usb_device *dev, unsigned long pipe, void *buffer,int transfer_len);
+int submit_uhci_control_msg(struct usb_device *dev, unsigned long pipe, void *buffer,
+			int transfer_len,struct devrequest *setup);
+int submit_uhci_int_msg(struct usb_device *dev, unsigned long pipe, void *buffer,
+			int transfer_len, int interval);
 
 /* Defines */
 #define USB_UHCI_VEND_ID 0x8086
 #define USB_UHCI_DEV_ID	 0x7112
-
+#define usb_ehci_flag  1
+#define usb_uhci_flag  2
+#define usb_ctl_pipe  4
+#define usb_bulk_pipe  8
+#define usb_bulk_inquiry  0x10
 #else
 #error USB Lowlevel not defined
 #endif
@@ -191,7 +164,12 @@ int submit_int_msg(struct usb_device *dev, unsigned long pipe, void *buffer,
 block_dev_desc_t *usb_stor_get_dev(int index);
 int usb_stor_scan(int mode);
 void usb_stor_info(void);
+#endif
 
+
+#define USB_MAX_ETH_DEV 5
+#ifdef CONFIG_USB_HOST_ETHER
+int usb_host_eth_scan(int mode);
 #endif
 
 #ifdef CONFIG_USB_KEYBOARD
@@ -216,7 +194,7 @@ int usb_bulk_msg(struct usb_device *dev, unsigned int pipe,
 			void *data, int len, int *actual_length, int timeout);
 int usb_submit_int_msg(struct usb_device *dev, unsigned long pipe,
 			void *buffer,int transfer_len, int interval);
-void usb_disable_asynch(int disable);
+int usb_disable_asynch(int disable);
 int usb_maxpacket(struct usb_device *dev,unsigned long pipe);
 void __inline__ wait_ms(unsigned long ms);
 int usb_get_configuration_no(struct usb_device *dev,unsigned char *buffer,int cfgno);
@@ -226,27 +204,15 @@ int usb_get_class_descriptor(struct usb_device *dev, int ifnum,
 int usb_clear_halt(struct usb_device *dev, int pipe);
 int usb_string(struct usb_device *dev, int index, char *buf, size_t size);
 int usb_set_interface(struct usb_device *dev, int interface, int alternate);
+int hub_port_reset(struct usb_device *dev, int port,	unsigned short *portstat);
+inline char *portspeed(int speed);
 
 /* big endian -> little endian conversion */
 /* some CPUs are already little endian e.g. the ARM920T */
-#ifdef LITTLEENDIAN
+//#ifdef LITTLEENDIAN
 #define swap_16(x) ((unsigned short)(x))
 #define swap_32(x) ((unsigned long)(x))
-#else
-#define swap_16(x) \
-	({ unsigned short x_ = (unsigned short)x; \
-	 (unsigned short)( \
-		((x_ & 0x00FFU) << 8) | ((x_ & 0xFF00U) >> 8) ); \
-	})
-#define swap_32(x) \
-	({ unsigned long x_ = (unsigned long)x; \
-	 (unsigned long)( \
-		((x_ & 0x000000FFUL) << 24) | \
-		((x_ & 0x0000FF00UL) <<	 8) | \
-		((x_ & 0x00FF0000UL) >>	 8) | \
-		((x_ & 0xFF000000UL) >> 24) ); \
-	})
-#endif /* LITTLEENDIAN */
+
 
 /*
  * Calling this entity a "pipe" is glorifying it. A USB pipe
@@ -272,7 +238,7 @@ int usb_set_interface(struct usb_device *dev, int interface, int alternate);
  *  - device:		bits 8-14
  *  - endpoint:		bits 15-18
  *  - Data0/1:		bit 19
- *  - speed:		bit 26		(0 = Full, 1 = Low Speed)
+ *  - speed:		bit 26		(0 = Full, 1 = Low Speed 2 high speed)
  *  - pipe type:	bits 30-31	(00 = isochronous, 01 = interrupt, 10 = control, 11 = bulk)
  *
  * Why? Because it's arbitrary, and whatever encoding we select is really
@@ -282,24 +248,42 @@ int usb_set_interface(struct usb_device *dev, int interface, int alternate);
  */
 /* Create various pipes... */
 #define create_pipe(dev,endpoint) \
-		(((dev)->devnum << 8) | (endpoint << 15) | ((dev)->slow << 26) | (dev)->maxpacketsize)
-#define default_pipe(dev) ((dev)->slow <<26)
+		(((dev)->devnum << 8) | ((endpoint) << 15) | \
+		((dev)->speed << 26) | (dev)->maxpacketsize)
+#define default_pipe(dev) ((dev)->speed << 26)
 
-#define usb_sndctrlpipe(dev,endpoint)	((PIPE_CONTROL << 30) | create_pipe(dev,endpoint))
-#define usb_rcvctrlpipe(dev,endpoint)	((PIPE_CONTROL << 30) | create_pipe(dev,endpoint) | USB_DIR_IN)
-#define usb_sndisocpipe(dev,endpoint)	((PIPE_ISOCHRONOUS << 30) | create_pipe(dev,endpoint))
-#define usb_rcvisocpipe(dev,endpoint)	((PIPE_ISOCHRONOUS << 30) | create_pipe(dev,endpoint) | USB_DIR_IN)
-#define usb_sndbulkpipe(dev,endpoint)	((PIPE_BULK << 30) | create_pipe(dev,endpoint))
-#define usb_rcvbulkpipe(dev,endpoint)	((PIPE_BULK << 30) | create_pipe(dev,endpoint) | USB_DIR_IN)
-#define usb_sndintpipe(dev,endpoint)	((PIPE_INTERRUPT << 30) | create_pipe(dev,endpoint))
-#define usb_rcvintpipe(dev,endpoint)	((PIPE_INTERRUPT << 30) | create_pipe(dev,endpoint) | USB_DIR_IN)
-#define usb_snddefctrl(dev)		((PIPE_CONTROL << 30) | default_pipe(dev))
-#define usb_rcvdefctrl(dev)		((PIPE_CONTROL << 30) | default_pipe(dev) | USB_DIR_IN)
+#define usb_sndctrlpipe(dev, endpoint)	((PIPE_CONTROL << 30) | \
+					 create_pipe(dev, endpoint))
+#define usb_rcvctrlpipe(dev, endpoint)	((PIPE_CONTROL << 30) | \
+					 create_pipe(dev, endpoint) | \
+					 USB_DIR_IN)
+#define usb_sndisocpipe(dev, endpoint)	((PIPE_ISOCHRONOUS << 30) | \
+					 create_pipe(dev, endpoint))
+#define usb_rcvisocpipe(dev, endpoint)	((PIPE_ISOCHRONOUS << 30) | \
+					 create_pipe(dev, endpoint) | \
+					 USB_DIR_IN)
+#define usb_sndbulkpipe(dev, endpoint)	((PIPE_BULK << 30) | \
+					 create_pipe(dev, endpoint))
+#define usb_rcvbulkpipe(dev, endpoint)	((PIPE_BULK << 30) | \
+					 create_pipe(dev, endpoint) | \
+					 USB_DIR_IN)
+#define usb_sndintpipe(dev, endpoint)	((PIPE_INTERRUPT << 30) | \
+					 create_pipe(dev, endpoint))
+#define usb_rcvintpipe(dev, endpoint)	((PIPE_INTERRUPT << 30) | \
+					 create_pipe(dev, endpoint) | \
+					 USB_DIR_IN)
+#define usb_snddefctrl(dev)		((PIPE_CONTROL << 30) | \
+					 default_pipe(dev))
+#define usb_rcvdefctrl(dev)		((PIPE_CONTROL << 30) | \
+					 default_pipe(dev) | \
+					 USB_DIR_IN)
 
 /* The D0/D1 toggle bits */
 #define usb_gettoggle(dev, ep, out) (((dev)->toggle[out] >> ep) & 1)
 #define usb_dotoggle(dev, ep, out)  ((dev)->toggle[out] ^= (1 << ep))
-#define usb_settoggle(dev, ep, out, bit) ((dev)->toggle[out] = ((dev)->toggle[out] & ~(1 << ep)) | ((bit) << ep))
+#define usb_settoggle(dev, ep, out, bit) ((dev)->toggle[out] = \
+						((dev)->toggle[out] & \
+						 ~(1 << ep)) | ((bit) << ep))
 
 /* Endpoint halt control/status */
 #define usb_endpoint_out(ep_dir)	(((ep_dir >> 7) & 1) ^ 1)
@@ -307,7 +291,8 @@ int usb_set_interface(struct usb_device *dev, int interface, int alternate);
 #define usb_endpoint_running(dev, ep, out) ((dev)->halted[out] &= ~(1 << (ep)))
 #define usb_endpoint_halted(dev, ep, out) ((dev)->halted[out] & (1 << (ep)))
 
-#define usb_packetid(pipe)	(((pipe) & USB_DIR_IN) ? USB_PID_IN : USB_PID_OUT)
+#define usb_packetid(pipe)	(((pipe) & USB_DIR_IN) ? USB_PID_IN : \
+				 USB_PID_OUT)
 
 #define usb_pipeout(pipe)	((((pipe) >> 7) & 1) ^ 1)
 #define usb_pipein(pipe)	(((pipe) >> 7) & 1)
@@ -315,7 +300,8 @@ int usb_set_interface(struct usb_device *dev, int interface, int alternate);
 #define usb_pipe_endpdev(pipe)	(((pipe) >> 8) & 0x7ff)
 #define usb_pipeendpoint(pipe)	(((pipe) >> 15) & 0xf)
 #define usb_pipedata(pipe)	(((pipe) >> 19) & 1)
-#define usb_pipeslow(pipe)	(((pipe) >> 26) & 1)
+#define usb_pipespeed(pipe)	(((pipe) >> 26) & 3)
+#define usb_pipeslow(pipe)	(usb_pipespeed(pipe) == USB_SPEED_LOW)
 #define usb_pipetype(pipe)	(((pipe) >> 30) & 3)
 #define usb_pipeisoc(pipe)	(usb_pipetype((pipe)) == PIPE_ISOCHRONOUS)
 #define usb_pipeint(pipe)	(usb_pipetype((pipe)) == PIPE_INTERRUPT)

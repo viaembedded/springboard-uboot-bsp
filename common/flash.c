@@ -29,6 +29,7 @@
 #if !defined(CFG_NO_FLASH)
 
 extern flash_info_t  flash_info[]; /* info for FLASH chips */
+extern flash_info_t flash_info_nor[CFG_MAX_NOR_FLASH_BANKS];
 
 /*-----------------------------------------------------------------------
  * Functions
@@ -103,8 +104,12 @@ addr2info (ulong addr)
 #ifndef CONFIG_SPD823TS
 	flash_info_t *info;
 	int i;
-
-	for (i=0, info=&flash_info[0]; i<CFG_MAX_FLASH_BANKS; ++i, ++info) {
+	unsigned int val = 0;
+	info=&flash_info[0];
+	if (((val>>1)&0x1) == 0 && ((val>>19)&0x1) == 0)
+		if (addr < 0xF0000000 && addr >= 0xE0000000)
+        info = &flash_info_nor[0];
+	for (i=0/*, info=&flash_info[0]*/; i<CFG_MAX_FLASH_BANKS; ++i, ++info) {
 		if (info->flash_id != FLASH_UNKNOWN &&
 		    addr >= info->start[0] &&
 		    /* WARNING - The '- 1' is needed if the flash

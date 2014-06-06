@@ -161,16 +161,16 @@ static void print_partition_extended (block_dev_desc_t *dev_desc, int ext_part_s
 static int get_partition_info_extended (block_dev_desc_t *dev_desc, int ext_part_sector,
 				 int relative, int part_num,
 				 int which_part, disk_partition_t *info)
-{
+{   
 	unsigned char buffer[DEFAULT_SECTOR_SIZE];
 	dos_partition_t *pt;
 	int i;
-
 	if (dev_desc->block_read (dev_desc->dev, ext_part_sector, 1, (ulong *) buffer) != 1) {
 		printf ("** Can't read partition table on %d:%d **\n",
 			dev_desc->dev, ext_part_sector);
 		return -1;
 	}
+  
 	if (buffer[DOS_PART_MAGIC_OFFSET] != 0x55 ||
 		buffer[DOS_PART_MAGIC_OFFSET + 1] != 0xaa) {
 		printf ("bad MBR sector signature 0x%02x%02x\n",
@@ -178,15 +178,25 @@ static int get_partition_info_extended (block_dev_desc_t *dev_desc, int ext_part
 			buffer[DOS_PART_MAGIC_OFFSET + 1]);
 		return -1;
 	}
-
 	/* Print all primary/logical partitions */
 	pt = (dos_partition_t *) (buffer + DOS_PART_TBL_OFFSET);
+	/*printf("pt->boot = %x\n",pt->boot_ind);
+	printf("pt->head = %x\n",pt->head);
+	printf("pt->sector = %x\n",pt->sector);
+	printf("pt->cyl = %x\n",pt->cyl);
+	printf("pt->sys_ind = %x\n",pt->sys_ind);
+	printf("pt->end_head = %x\n",pt->end_head);
+	printf("pt->end_sector = %x\n",pt->end_sector);
+	printf("pt->end_cyl = %x\n",pt->end_cyl);
+	printf("start4[0] = %x, %x, %x ,%x\n",pt->start4[0],pt->start4[1],pt->start4[2],pt->start4[3]);
+	printf("size4[0] = %x ,%x ,%x ,%x \n",pt->size4[0],pt->size4[1],pt->size4[2],pt->size4[3]);*/
 	for (i = 0; i < 4; i++, pt++) {
-		/*
+		/* 
 		 * fdisk does not show the extended partitions that
 		 * are not in the MBR
-		 */
-		if ((pt->sys_ind != 0) &&
+		 */		
+		if (((pt->boot_ind & ~0x80) == 0) && //eason 
+			(pt->sys_ind != 0) &&
 		    (part_num == which_part) &&
 		    (is_extended(pt->sys_ind) == 0)) {
 			info->blksz = 512;
@@ -214,7 +224,6 @@ static int get_partition_info_extended (block_dev_desc_t *dev_desc, int ext_part
 			sprintf ((char *)info->type, "U-Boot");
 			return 0;
 		}
-
 		/* Reverse engr the fdisk part# assignment rule! */
 		if ((ext_part_sector == 0) ||
 		    (pt->sys_ind != 0 && !is_extended (pt->sys_ind)) ) {
@@ -223,6 +232,7 @@ static int get_partition_info_extended (block_dev_desc_t *dev_desc, int ext_part
 	}
 
 	/* Follows the extended partitions */
+
 	pt = (dos_partition_t *) (buffer + DOS_PART_TBL_OFFSET);
 	for (i = 0; i < 4; i++, pt++) {
 		if (is_extended (pt->sys_ind)) {

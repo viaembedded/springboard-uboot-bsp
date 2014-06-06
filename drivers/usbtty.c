@@ -143,7 +143,7 @@ static struct usb_endpoint_descriptor ep_descriptors[NUM_ENDPOINTS] = {
     bDescriptorType:	 USB_DT_ENDPOINT,
     bEndpointAddress:	 CONFIG_USBD_SERIAL_OUT_ENDPOINT | USB_DIR_OUT,
     bmAttributes:	 USB_ENDPOINT_XFER_BULK,
-    wMaxPacketSize:	 CONFIG_USBD_SERIAL_OUT_PKTSIZE,
+    wMaxPacketSize:	 1024,//CONFIG_USBD_SERIAL_OUT_PKTSIZE,
     bInterval:		 0
   },
   {
@@ -151,7 +151,7 @@ static struct usb_endpoint_descriptor ep_descriptors[NUM_ENDPOINTS] = {
     bDescriptorType:	 USB_DT_ENDPOINT,
     bEndpointAddress:	 CONFIG_USBD_SERIAL_IN_ENDPOINT | USB_DIR_IN,
     bmAttributes:	 USB_ENDPOINT_XFER_BULK,
-    wMaxPacketSize:	 CONFIG_USBD_SERIAL_IN_PKTSIZE,
+    wMaxPacketSize:	 1024,//CONFIG_USBD_SERIAL_IN_PKTSIZE, //Neil
     bInterval:		 0
   },
   {
@@ -159,7 +159,7 @@ static struct usb_endpoint_descriptor ep_descriptors[NUM_ENDPOINTS] = {
     bDescriptorType:	 USB_DT_ENDPOINT,
     bEndpointAddress:	 CONFIG_USBD_SERIAL_INT_ENDPOINT | USB_DIR_IN,
     bmAttributes:	 USB_ENDPOINT_XFER_INT,
-    wMaxPacketSize:	 CONFIG_USBD_SERIAL_INT_PKTSIZE,
+    wMaxPacketSize:	 10,//CONFIG_USBD_SERIAL_INT_PKTSIZE, //Neil
     bInterval:		 0
   },
 };
@@ -213,13 +213,50 @@ int usbtty_tstc (void)
 int usbtty_getc (void)
 {
 	char c;
+	
+	int tmp=0;
 
-	while (usbtty_input.size <= 0) {
-		usbtty_poll ();
+    usbtty_poll ();
+    if(usbtty_input.size > 0) {	
+        buf_pop (&usbtty_input, &c, 1);
+        tmp++;
+    }
+    
+	return tmp?c:0;
+}
+unsigned char tmp_s[512];
+unsigned int tmp_state=0,tmp_len=0;
+void usbtty_puts (const char *str);
+void usbtty_putc (const char c);
+static void pre_buf(const char *s,int len)
+{
+  int total=len;
+  
+	while(len)
+	{
+	    tmp_s[tmp_len] = *s++;
+	    tmp_len++;
+	    len--;
 	}
 
-	buf_pop (&usbtty_input, &c, 1);
-	return c;
+	if(tmp_state == 1)
+	{
+		  tmp_state = 2;	
+	  
+		  if(total == 1)
+		  {
+		  	  total = tmp_len;
+		  	  //led_light(1);
+		      while(total)
+		      {
+		      	  
+		          usbtty_putc(tmp_s[tmp_len-total]);
+		          total--;
+		      }   
+		  } else	
+	        usbtty_puts(&tmp_s);
+  }
+ 
 }
 
 /*
@@ -227,15 +264,20 @@ int usbtty_getc (void)
  */
 void usbtty_putc (const char c)
 {
-	buf_push (&usbtty_output, &c, 1);
-	/* If \n, also do \r */
-	if (c == '\n')
-		buf_push (&usbtty_output, "\r", 1);
+	if(tmp_state < 2)
+	    pre_buf(&c,1);	
+	else{
+  	buf_push (&usbtty_output, &c, 1);
+    	/* If \n, also do \r */
+    	if (c == '\n')
+    		buf_push (&usbtty_output, "\r", 1);
+    
+    	/* Poll at end to handle new data... */
+    	if ((usbtty_output.size + 2) >= usbtty_output.totalsize) {
+    		usbtty_poll ();
+    	}
+  }
 
-	/* Poll at end to handle new data... */
-	if ((usbtty_output.size + 2) >= usbtty_output.totalsize) {
-		usbtty_poll ();
-	}
 }
 
 
@@ -284,25 +326,32 @@ void usbtty_puts (const char *str)
 {
 	int n;
 	int len = strlen (str);
-
+ // 				*(volatile unsigned int *)(0xD81100C0) =	*(volatile unsigned int *)(0xD81100C0) ^ 0x100;
 	/* add '\r' for each '\n' */
-	while (len > 0) {
-		n = next_nl_pos (str);
+	if(tmp_state < 2)
+	    pre_buf(str,len);	
+	else{    
 
-		if (str[n] == '\n') {
-			__usbtty_puts (str, n + 1);
-			__usbtty_puts ("\r", 1);
-			str += (n + 1);
-			len -= (n + 1);
-		} else {
-			/* No \n found.	 All done. */
-			__usbtty_puts (str, n);
-			break;
-		}
-	}
+    	while (len > 0) {
+    		n = next_nl_pos (str);
+    
+    		if (str[n] == '\n') {
+		 			__usbtty_puts (str, n + 1);
+					__usbtty_puts ("\r", 1);
+ 					str += (n + 1);
+    			len -= (n + 1);
+    		} else {
+    			/* No \n found.	 All done. */
+    			__usbtty_puts (str, n);
+    			break;
+    		}
+    	}
 
-	/* Poll at end to handle new data... */
-	usbtty_poll ();
+    	/* Poll at end to handle new data... */
+    	usbtty_poll ();
+  }
+  
+
 }
 
 /*
@@ -352,8 +401,22 @@ int drv_usbtty_init (void)
 	usbttydev.getc = usbtty_getc;	/* 'getc' function */
 	usbttydev.putc = usbtty_putc;	/* 'putc' function */
 	usbttydev.puts = usbtty_puts;	/* 'puts' function */
-
 	rc = device_register (&usbttydev);
+tmp_state = 1;
+if(0){
+char c;
+
+{
+int test=0x10000;
+
+    while(test){
+    wmt_udc_irq();	
+    c = usbtty_getc();
+    
+    }
+  }
+
+}
 
 	return (rc == 0) ? 1 : rc;
 }
@@ -480,9 +543,9 @@ static void usbtty_init_endpoints (void)
 	int i;
 
 	bus_instance->max_endpoints = NUM_ENDPOINTS + 1;
-	for (i = 0; i <= NUM_ENDPOINTS; i++) {
-		udc_setup_ep (device_instance, i, &endpoint_instance[i]);
-	}
+	//for (i = 0; i <= NUM_ENDPOINTS; i++) {                                   //Neil
+	//	udc_setup_ep (device_instance, i, &endpoint_instance[i]);              //Neil
+	//}                                                                        //Neil
 }
 
 
@@ -629,7 +692,7 @@ static void usbtty_event_handler (struct usb_device_instance *device,
  */
 void usbtty_poll (void)
 {
-	/* New interrupts? */
+ 	/* New interrupts? */
 	pretend_interrupts ();
 
 	/* Write any output data to host buffer (do this before checking interrupts to avoid missing one) */
@@ -656,10 +719,10 @@ static void pretend_interrupts (void)
 	 * polling delay is likely to miss
 	 * host requests.
 	 */
-	while (inw (UDC_IRQ_SRC) & ~UDC_SOF_Flg) {
-		/* Handle any new IRQs */
-		omap1510_udc_irq ();
-		omap1510_udc_noniso_irq ();
-	}
+   if(tmp_state>1)
+    {
+     while (wmt_udc_irq ());  
+    }/* Handle any new IRQs */
+                                             
 }
 #endif

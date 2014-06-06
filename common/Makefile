@@ -5,20 +5,20 @@
 # See file CREDITS for list of people who contributed to this
 # project.
 #
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License as
-# published by the Free Software Foundation; either version 2 of
-# the License, or (at your option) any later version.
+# Some descriptions of such software. Copyright (c) 2008 WonderMedia Technologies, Inc.
 #
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	See the
-# GNU General Public License for more details.
+# This program is free software: you can redistribute it and/or modify it under the
+# terms of the GNU General Public License as published by the Free Software Foundation,
+# either version 2 of the License, or (at your option) any later version.
 #
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 59 Temple Place, Suite 330, Boston,
-# MA 02111-1307 USA
+# This program is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+# PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+# You should have received a copy of the GNU General Public License along with
+# this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+# WonderMedia Technologies, Inc.
+# 10F, 529, Chung-Cheng Road, Hsin-Tien, Taipei 231, R.O.C.
 #
 
 include $(TOPDIR)/config.mk
@@ -36,7 +36,7 @@ COBJS	= main.o ACEX1K.o altera.o bedbug.o circbuf.o \
 	  cmd_fat.o cmd_fdc.o cmd_fdos.o cmd_flash.o cmd_fpga.o \
 	  cmd_i2c.o cmd_ide.o cmd_immap.o cmd_itest.o cmd_jffs2.o \
 	  cmd_load.o cmd_log.o \
-	  cmd_mem.o cmd_mii.o cmd_misc.o cmd_mmc.o \
+	  cmd_mem.o cmd_mii.o cmd_misc.o cmd_mmc.o cmd_dma.o\
 	  cmd_nand.o cmd_net.o cmd_nvedit.o \
 	  cmd_pci.o cmd_pcmcia.o cmd_portio.o \
 	  cmd_reginfo.o cmd_reiser.o cmd_scsi.o cmd_spi.o cmd_universe.o \
@@ -46,6 +46,13 @@ COBJS	= main.o ACEX1K.o altera.o bedbug.o circbuf.o \
 	  env_nand.o env_dataflash.o env_flash.o env_eeprom.o \
 	  env_nvram.o env_nowhere.o \
 	  exports.o \
+	  wmt_display/pwm.o wmt_display/wmt-ost.o wmt_display/vpp-osif.o \
+	  wmt_display/govrh.o wmt_display/vout.o wmt_display/devices/lcd.o wmt_display/lvds.o wmt_display/vpp.o \
+	  wmt_display/hdmi.o wmt_display/sw_i2c.o wmt_display/parse-edid.o wmt_display/vout-wmt.o  \
+  	  wmt_display/devices/lcd-lvds.o wmt_display/devices/lcd-ttl.o \
+	  wmt_display/devices/vt1632.o wmt_display/devices/sil902x.o wmt_display/devices/ch7305.o \
+	  wmt_display/wmt_cmd_display.o  wmt_display/minivgui.o wmt_display/uboot-vpp.o \
+  	  wmt_display/cmd_mbit.o wmt_display/cmd_textout.o wmt_display/env_parse.o\
 	  flash.o fpga.o ft_build.o \
 	  hush.o kgdb.o lcd.o lists.o lynxkdi.o \
 	  memsize.o miiphybb.o miiphyutil.o \
